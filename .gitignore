@@ -1,2 +1,5 @@
 Library/
 *.sln
+Temp/
+*.csproj
+.idea/
