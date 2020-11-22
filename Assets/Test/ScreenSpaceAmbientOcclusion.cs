@@ -61,7 +61,6 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         var aoRT = RenderTexture.GetTemporary(source.width >> DownSample, source.height >> DownSample, 0);
         //把噪声图筛进去
         ssaoMaterial.SetTexture("_NoiseTex", Nosie);
-        ssaoMaterial.SetMatrix("_InverseProjectionMatrix", currentCamera.projectionMatrix.inverse);
         //ssaoMaterial.SetFloat("_DepthBiasValue", DepthBiasValue);
         ssaoMaterial.SetVectorArray("_SampleKernelArray", sampleKernelList.ToArray());
         ssaoMaterial.SetFloat("_SampleKernelCount", sampleKernelList.Count);

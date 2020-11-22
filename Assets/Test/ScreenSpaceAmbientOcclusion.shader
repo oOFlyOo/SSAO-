@@ -24,7 +24,6 @@
     #define MAX_SAMPLE_KERNEL_COUNT 64
     sampler2D _MainTex;
     sampler2D _CameraDepthNormalsTexture;
-    float4x4 _InverseProjectionMatrix;
     //float _DepthBiasValue;
     float4 _SampleKernelArray[MAX_SAMPLE_KERNEL_COUNT];
     float _SampleKernelCount;
@@ -75,8 +74,8 @@
         DecodeDepthNormal(cdn, linear01Depth, viewNormal);
 
         float3 viewPos = linear01Depth * i.viewRay;
-        viewNormal = normalize(viewNormal) * float3(1, 1, -1);
-
+        viewNormal = normalize(viewNormal);
+        
         //铺平纹理
         float2 noiseScale = float2(_ScreenParams.x * _NoiseTex_TexelSize.x, _ScreenParams.y * _NoiseTex_TexelSize.y);
         float2 noiseUV = i.uv * noiseScale;
@@ -84,7 +83,7 @@
         float3 randvec = tex2D(_NoiseTex, noiseUV).xyz;
         randvec.xy = randvec.xy * 2 - 1;
         // randvec = float3(1, 0, 0);
-        //Gramm-Schimidt处理创建正交基
+        //Gram-Schimidt处理创建正交基
         float3 tangent = normalize(randvec - viewNormal * dot(randvec, viewNormal));
         float3 bitangent = cross(viewNormal, tangent);
         float3x3 TBN = float3x3(tangent, bitangent, viewNormal);
