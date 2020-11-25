@@ -405,12 +405,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Nosie: {fileID: 2800000, guid: 729dd685cbe6d2a4b9058c8e07912a47, type: 3}
-  SampleKernelRadius: 0.16
+  SampleKernelRadius: 0.594
   SampleKernelCount: 64
   DownSample: 0
   BlurRadius: 2
   BilaterFilterStrength: 0.2
-  OnlyShowAO: 0
+  OnlyShowAO: 1
 --- !u!114 &762049040
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -424,12 +424,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Nosie: {fileID: 2800000, guid: 67b349d1f454a6545ac26427b421b91a, type: 3}
-  SampleKernelRadius: 0.16
+  SampleKernelRadius: 0.487
   SampleKernelCount: 64
   DownSample: 0
+  DepthBias: 0.1
   BlurRadius: 2
   BilaterFilterStrength: 0.2
   OnlyShowAO: 1
+  UseBlur: 1
 --- !u!1 &763549398
 GameObject:
   m_ObjectHideFlags: 0
