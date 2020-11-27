@@ -72,8 +72,14 @@
         #endif
         
         float4 position_s = float4(uv.x * 2 - 1, uv.y * 2 - 1, d * 2 - 1, 1.0f);
-        float4 position_v = mul(_Inverse, position_s);
-        float3 pos = position_v.xyz / position_v.w;
+        // float4 position_v = mul(_Inverse, position_s);
+        
+        float4 position_v = mul(unity_CameraInvProjection, position_s);
+        position_v = position_v / position_v.w;
+        position_v.z *= -1;
+        float3 pos = mul(unity_CameraToWorld, position_v).xyz;
+        
+        // float3 pos = position_v.xyz / position_v.w;
         
         viewNormal = cross(ddx(pos), _ProjectionParams.x * ddy(pos));
         
