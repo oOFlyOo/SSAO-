@@ -20,14 +20,16 @@
         float3 viewRay : TEXCOORD1;
     };
 
-
+    
     #define MAX_SAMPLE_KERNEL_COUNT 64
     sampler2D _MainTex;
+    #ifdef NORMAL_FROM_DEPTH
+    sampler2D _CameraDepthTexture;
+    #else
     sampler2D _CameraDepthNormalsTexture;
-    // float _DepthBiasValue;
+    #endif
     float4 _SampleKernelArray[MAX_SAMPLE_KERNEL_COUNT];
     float _SampleKernelCount;
-    //float _AOStrength;
     float _SampleKeneralRadius;
     float _DepthBias;
 
@@ -39,37 +41,58 @@
     sampler2D _NoiseTex;
     float4 _NoiseTex_TexelSize;
 
+    float4x4 _Inverse;
+
+    #pragma shader_feature NORMAL_FROM_DEPTH
     // #define NORMAL_FROM_DEPTH;
-    #define RANDOM_TBN;
+    // #define RANDOM_TBN;
     #define RANDOM_ROTATION;
     #define DEPTH_BIAS;
     #define BILATERAL_FILTER;
 
     void NormalFromTexture(float2 uv, out float linear01Depth, out float3 viewNormal)
     {
+        #ifndef NORMAL_FROM_DEPTH
         float4 cdn = tex2D(_CameraDepthNormalsTexture, uv);
         //采样获得深度值和法线值
         DecodeDepthNormal(cdn, linear01Depth, viewNormal);
         viewNormal = normalize(viewNormal);
-
-        #ifndef NORMAL_FROM_DEPTH
-        return;
         #else
 
-        // const float offset = 0.001;
-        // const float2 offset1 = float2(0.0, offset);
+        linear01Depth = Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
+        float d = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
+        
+        #if defined(UNITY_REVERSED_Z)
+        d = 1.0 - d;
+        #endif
+        
+        #if UNITY_UV_STARTS_AT_TOP
+        if (_MainTex_TexelSize.y < 0)
+        uv.y = 1 - uv.y;
+        #endif
+        
+        float4 position_s = float4(uv.x * 2 - 1, uv.y * 2 - 1, d * 2 - 1, 1.0f);
+        float4 position_v = mul(_Inverse, position_s);
+        float3 pos = position_v.xyz / position_v.w;
+        
+        viewNormal = cross(ddx(pos), _ProjectionParams.x * ddy(pos));
+        
+        // viewNormal = cross(ddx(pos), ddy(pos));
+        // viewNormal = normalize(mul((float3x3)unity_WorldToCamera, viewNormal));
+        viewNormal = normalize(mul(viewNormal, (float3x3)unity_CameraToWorld));
+        // viewNormal = normalize(viewNormal);
+        viewNormal.z = -viewNormal.z;
+        // viewNormal = pos;
+        return;
+        
+        linear01Depth = Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
         const float2 offset1 = float2(0.0, _ScreenParams.w - 1);
-        // const float2 offset2 = float2(offset, 0.0);
         const float2 offset2 = float2(_ScreenParams.z - 1, 0.0);
-        float4 cdn1 = tex2D(_CameraDepthNormalsTexture, uv + offset1);
-        float4 cdn2 = tex2D(_CameraDepthNormalsTexture, uv + offset2);
         //采样获得深度值和法线值
-        float depth1 = DecodeFloatRG(cdn1.zw);
-        float depth2 = DecodeFloatRG(cdn2.zw);
-        // float3 p1 = float3(offset1 * (_ProjectionParams.w * 0.001), depth1 - linear01Depth);
-        float3 p1 = float3(offset1 * depth1, depth1 - linear01Depth);
-        // float3 p2 = float3(offset2 * (_ProjectionParams.w * 0.001), depth2 - linear01Depth);
-        float3 p2 = float3(offset2 * depth2, depth2 - linear01Depth);
+        float depth1 =  Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + offset1));
+        float depth2 = Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv + offset2));
+        float3 p1 = float3(offset1 * linear01Depth, depth1 - linear01Depth);
+        float3 p2 = float3(offset2 * linear01Depth, depth2 - linear01Depth);
         float3 normal = cross(p1, p2);
         normal.z = -normal.z;
 
@@ -85,7 +108,7 @@
         #else
         float depth;
         float3 viewNormal;
-        
+
         NormalFromTexture(uv, depth, viewNormal);
         return viewNormal;
         #endif
@@ -129,7 +152,7 @@
         #ifndef RANDOM_ROTATION
         randvec = float3(1, 0, 0);
         #endif
-        
+
         #ifdef RANDOM_TBN
         //Gram-Schimidt处理创建正交基
         float3 tangent = normalize(randvec - viewNormal * dot(randvec, viewNormal));
@@ -151,7 +174,9 @@
             float3 randomVec = _SampleKernelArray[i].xyz;
             randomVec = reflect(randomVec, randvec);
             ////如果随机点的位置与法线反向，那么将随机方向取反，使之保证在法线半球
-            randomVec = dot(randomVec, viewNormal) < 0 ? -randomVec : randomVec;
+            half dirDif = step(0, dot(randomVec, viewNormal));
+            randomVec = randomVec * (dirDif * 2 - 1);
+            // randomVec = dot(randomVec, viewNormal) < 0 ? -randomVec : randomVec;
             #endif
 
             float3 randomPos = viewPos + randomVec * _SampleKeneralRadius;
@@ -169,11 +194,12 @@
             #endif
 
             //1.range check & accumulate
-            float rangeCheck = smoothstep(1, 0, _SampleKeneralRadius / (abs(randomDepth - linear01Depth) * _ProjectionParams.z));
-            // float rangeCheck = smoothstep(0.0, 1.0, _SampleKeneralRadius / abs(randomDepth - linear01Depth));
+            float rangeCheck = smoothstep(
+                1, 0, _SampleKeneralRadius / (abs(randomDepth - linear01Depth) * _ProjectionParams.z));
 
-            oc += (randomDepth >= linear01Depth ? 1.0 : rangeCheck);
-            // oc += (randomDepth >= linear01Depth ? 1.0 : 0.0) * rangeCheck;
+            // oc += (randomDepth >= linear01Depth ? 1.0 : rangeCheck);
+            half depthDif = step(linear01Depth, randomDepth);
+            oc += depthDif + (1 - depthDif) * rangeCheck;
         }
         oc = oc / sampleCount;
 

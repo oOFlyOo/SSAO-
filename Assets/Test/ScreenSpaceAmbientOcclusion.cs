@@ -30,6 +30,7 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
 
     public bool OnlyShowAO = false;
     public bool UseBlur = true;
+    public bool NormalFromDepth = false;
 
     public enum SSAOPassName
     {
@@ -48,19 +49,26 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
 
     private void OnEnable()
     {
-        currentCamera.depthTextureMode |= DepthTextureMode.DepthNormals;
+        currentCamera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.DepthNormals;
     }
 
     private void OnDisable()
     {
-        currentCamera.depthTextureMode &= ~DepthTextureMode.DepthNormals;
+        currentCamera.depthTextureMode = DepthTextureMode.None;
     }
 
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         GenerateAOSampleKernel();
 
-        
+        if (NormalFromDepth)
+        {
+            ssaoMaterial.EnableKeyword("NORMAL_FROM_DEPTH");
+        }
+        else
+        {
+            ssaoMaterial.DisableKeyword("NORMAL_FROM_DEPTH");
+        }
         //把噪声图筛进去
         ssaoMaterial.SetTexture("_NoiseTex", Nosie);
         //ssaoMaterial.SetFloat("_DepthBiasValue", DepthBiasValue);
@@ -69,6 +77,8 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         //ssaoMaterial.SetFloat("_AOStrength", AOStrength);
         ssaoMaterial.SetFloat("_SampleKeneralRadius", SampleKernelRadius);
         ssaoMaterial.SetFloat("_DepthBias", DepthBias);
+        
+        ssaoMaterial.SetMatrix("_Inverse", (currentCamera.projectionMatrix * currentCamera.worldToCameraMatrix).inverse);
 
         if (OnlyShowAO && !UseBlur)
         {
