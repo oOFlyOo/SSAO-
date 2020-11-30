@@ -57,6 +57,9 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         currentCamera.depthTextureMode = DepthTextureMode.None;
     }
 
+    
+    // ImageEffectOpaque 可以保证效果在半透之前
+    [ImageEffectOpaque]
     private void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
         GenerateAOSampleKernel();
