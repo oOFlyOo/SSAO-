@@ -18,9 +18,10 @@
         float2 uv : TEXCOORD0;
         float4 vertex : SV_POSITION;
         float3 viewRay : TEXCOORD1;
+        float3 worldRay : TEXCOORD2;
     };
 
-    
+
     #define MAX_SAMPLE_KERNEL_COUNT 64
     sampler2D _MainTex;
     #ifdef NORMAL_FROM_DEPTH
@@ -45,12 +46,12 @@
 
     #pragma shader_feature NORMAL_FROM_DEPTH
     // #define NORMAL_FROM_DEPTH;
-    // #define RANDOM_TBN;
+    #define RANDOM_TBN;
     #define RANDOM_ROTATION;
     #define DEPTH_BIAS;
     #define BILATERAL_FILTER;
 
-    void NormalFromTexture(float2 uv, out float linear01Depth, out float3 viewNormal)
+    void NormalFromTexture(float2 uv, out float linear01Depth, out float3 viewNormal, float3 worldRay)
     {
         #ifndef NORMAL_FROM_DEPTH
         float4 cdn = tex2D(_CameraDepthNormalsTexture, uv);
@@ -60,24 +61,26 @@
         #else
 
         linear01Depth = Linear01Depth(SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv));
-        float d = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
-        
-        #if defined(UNITY_REVERSED_Z)
-        d = 1.0 - d;
-        #endif
-        
-        #if UNITY_UV_STARTS_AT_TOP
-        if (_MainTex_TexelSize.y < 0)
-        uv.y = 1 - uv.y;
-        #endif
-        
-        float4 position_s = float4(uv.x * 2 - 1, uv.y * 2 - 1, d * 2 - 1, 1.0f);
-        // float4 position_v = mul(_Inverse, position_s);
-        
-        float4 position_v = mul(unity_CameraInvProjection, position_s);
-        position_v = position_v / position_v.w;
-        position_v.z *= -1;
-        float3 pos = mul(unity_CameraToWorld, position_v).xyz;
+        // float d = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, uv);
+        //
+        // #if defined(UNITY_REVERSED_Z)
+        // d = 1.0 - d;
+        // #endif
+        //
+        // #if UNITY_UV_STARTS_AT_TOP
+        // if (_MainTex_TexelSize.y < 0)
+        // uv.y = 1 - uv.y;
+        // #endif
+        //
+        // float4 position_s = float4(uv.x * 2 - 1, uv.y * 2 - 1, d * 2 - 1, 1.0f);
+        // // float4 position_v = mul(_Inverse, position_s);
+        //
+        // float4 position_v = mul(unity_CameraInvProjection, position_s);
+        // position_v = position_v / position_v.w;
+        // position_v.z *= -1;
+        // float3 pos = mul(unity_CameraToWorld, position_v).xyz;
+
+        float3 pos = _WorldSpaceCameraPos + linear01Depth * worldRay * _ProjectionParams.z;
         
         // float3 pos = position_v.xyz / position_v.w;
         
@@ -106,7 +109,7 @@
         #endif
     }
 
-    float3 GetNormal(float2 uv)
+    float3 GetNormal(float2 uv, float3 worldRay)
     {
         #ifndef NORMAL_FROM_DEPTH
         float4 cdn = tex2D(_CameraDepthNormalsTexture, uv);
@@ -115,7 +118,7 @@
         float depth;
         float3 viewNormal;
 
-        NormalFromTexture(uv, depth, viewNormal);
+        NormalFromTexture(uv, depth, viewNormal, worldRay);
         return viewNormal;
         #endif
     }
@@ -133,6 +136,12 @@
         float4 clipPos = float4(v.uv * 2 - 1.0, 1.0, 1.0);
         float4 viewRay = mul(unity_CameraInvProjection, clipPos);
         o.viewRay = viewRay.xyz / viewRay.w;
+
+        float3 worldRay = o.viewRay;
+        worldRay.z *= -1;
+        worldRay.xyz = mul((float3x3)unity_CameraToWorld, worldRay);
+        o.worldRay = worldRay;
+
         return o;
     }
 
@@ -144,7 +153,7 @@
         float linear01Depth;
         float3 viewNormal;
 
-        NormalFromTexture(i.uv, linear01Depth, viewNormal);
+        NormalFromTexture(i.uv, linear01Depth, viewNormal, i.worldRay);
         // return float4(viewNormal, 1);
         float3 viewPos = linear01Depth * i.viewRay;
 
@@ -153,7 +162,11 @@
         float2 noiseUV = i.uv * noiseScale;
         //采样噪声图
         float3 randvec = tex2D(_NoiseTex, noiseUV).xyz;
+        #ifdef RANDOM_TBN
         randvec.xy = randvec.xy * 2 - 1;
+        #else
+        randvec = randvec * 2 - 1;
+        #endif
 
         #ifndef RANDOM_ROTATION
         randvec = float3(1, 0, 0);
@@ -169,15 +182,15 @@
         int sampleCount = _SampleKernelCount;
 
         float oc = 0.0;
-        for (int i = 0; i < sampleCount; i++)
+        for (int j = 0; j < sampleCount; j++)
         {
             #ifdef RANDOM_TBN
             //1.注意不要把矩阵乘反了，否则得到的结果很黑;CG语言构造矩阵是"行优先"，OpenGL是"列优先"，两者之间是转置的关系,所以请把learnOpenGL中的顺序反过来
             // float3 randomVec = mul(TBN, _SampleKernelArray[i].xyz);
-            float3 randomVec = mul(_SampleKernelArray[i].xyz, TBN);
+            float3 randomVec = mul(_SampleKernelArray[j].xyz, TBN);
             #else
             //2.
-            float3 randomVec = _SampleKernelArray[i].xyz;
+            float3 randomVec = _SampleKernelArray[j].xyz;
             randomVec = reflect(randomVec, randvec);
             ////如果随机点的位置与法线反向，那么将随机方向取反，使之保证在法线半球
             half dirDif = step(0, dot(randomVec, viewNormal));
@@ -193,7 +206,7 @@
 
             float randomDepth;
             float3 randomNormal;
-            NormalFromTexture(rscreenPos, randomDepth, randomNormal);
+            NormalFromTexture(rscreenPos, randomDepth, randomNormal, i.worldRay);
 
             #ifdef DEPTH_BIAS
             randomDepth = randomDepth + _DepthBias * _ProjectionParams.w;
@@ -256,13 +269,13 @@
         return result / 7;
         #else
 
-        float3 normal = GetNormal(uv);
-        float3 normal0a = GetNormal(uv0a);
-        float3 normal0b = GetNormal(uv0b);
-        float3 normal1a = GetNormal(uv1a);
-        float3 normal1b = GetNormal(uv1b);
-        float3 normal2a = GetNormal(uv2a);
-        float3 normal2b = GetNormal(uv2b);
+        float3 normal = GetNormal(uv, i.worldRay);
+        float3 normal0a = GetNormal(uv0a, i.worldRay);
+        float3 normal0b = GetNormal(uv0b, i.worldRay);
+        float3 normal1a = GetNormal(uv1a, i.worldRay);
+        float3 normal1b = GetNormal(uv1b, i.worldRay);
+        float3 normal2a = GetNormal(uv2a, i.worldRay);
+        float3 normal2b = GetNormal(uv2b, i.worldRay);
 
         half w = 0.37004405286;
         half w0a = CompareNormal(normal, normal0a) * 0.31718061674;
@@ -314,7 +327,7 @@
         Pass
         {
             CGPROGRAM
-            #pragma vertex vert
+            #pragma vertex vert_ao
             #pragma fragment frag_blur
             ENDCG
         }

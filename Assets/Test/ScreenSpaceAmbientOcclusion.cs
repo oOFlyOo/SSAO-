@@ -15,7 +15,7 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
     [Range(0.010f, 1.0f)]
     public float SampleKernelRadius = 0.16f;
     [Range(4, 64)]
-    public int SampleKernelCount = 64;
+    public int SampleKernelCount = 32;
     //[Range(0.0f, 5.0f)]
     //public float AOStrength = 1.0f;
     [Range(0, 2)]
@@ -71,14 +71,12 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         }
         //把噪声图筛进去
         ssaoMaterial.SetTexture("_NoiseTex", Nosie);
-        //ssaoMaterial.SetFloat("_DepthBiasValue", DepthBiasValue);
         ssaoMaterial.SetVectorArray("_SampleKernelArray", sampleKernelList.ToArray());
         ssaoMaterial.SetFloat("_SampleKernelCount", sampleKernelList.Count);
-        //ssaoMaterial.SetFloat("_AOStrength", AOStrength);
         ssaoMaterial.SetFloat("_SampleKeneralRadius", SampleKernelRadius);
         ssaoMaterial.SetFloat("_DepthBias", DepthBias);
         
-        ssaoMaterial.SetMatrix("_Inverse", (currentCamera.projectionMatrix * currentCamera.worldToCameraMatrix).inverse);
+        // ssaoMaterial.SetMatrix("_Inverse", (currentCamera.projectionMatrix * currentCamera.worldToCameraMatrix).inverse);
 
         if (OnlyShowAO && !UseBlur)
         {

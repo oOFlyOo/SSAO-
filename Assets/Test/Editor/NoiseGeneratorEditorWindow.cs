@@ -29,9 +29,11 @@ public class NoiseGeneratorEditorWindow : EditorWindow
         {
             for (int j = 0; j < x; j = j + step)
             {
-                var vec = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), 0);
+                // var vec = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), 0);
+                var vec = new Vector3(Random.Range(-1f, 1f), Random.Range(-1f, 1f), Random.Range(-1f, 1f));
                 vec.Normalize();
-                vec = (vec + new Vector3(1, 1, 0)) * 0.5f;
+                // vec = (vec + new Vector3(1, 1, 0)) * 0.5f;
+                vec = (vec + new Vector3(1, 1, 1)) * 0.5f;
                 
                 pixel[i * size + j] = new Color(vec.x, vec.y, vec.z);
             }
