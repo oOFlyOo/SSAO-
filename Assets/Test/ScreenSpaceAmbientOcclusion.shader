@@ -80,7 +80,7 @@
         // position_v.z *= -1;
         // float3 pos = mul(unity_CameraToWorld, position_v).xyz;
 
-        float3 pos = _WorldSpaceCameraPos + linear01Depth * worldRay * _ProjectionParams.z;
+        float3 pos = _WorldSpaceCameraPos + linear01Depth * worldRay;
         
         // float3 pos = position_v.xyz / position_v.w;
         
