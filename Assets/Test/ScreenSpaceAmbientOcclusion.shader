@@ -199,9 +199,9 @@
             #endif
 
             float3 randomPos = viewPos + randomVec * _SampleKeneralRadius;
-            float3 rclipPos = mul((float3x3)unity_CameraProjection, randomPos);
+            float4 rclipPos = mul(unity_CameraProjection, float4(randomPos, 1));
             // float3 rclipPos = mul((float3x3)UNITY_MATRIX_P, randomPos);
-            float2 rscreenPos = (rclipPos.xy / rclipPos.z) * 0.5 + 0.5;
+            float2 rscreenPos = (rclipPos.xy / rclipPos.w) * 0.5 + 0.5;
             // float2 rscreenPos = -(rclipPos.xy / randomPos.z) * 0.5 + 0.5;
 
             float randomDepth;
