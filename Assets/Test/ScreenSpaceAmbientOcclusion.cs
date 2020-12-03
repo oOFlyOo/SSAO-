@@ -37,6 +37,7 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         GenerateAO = 0,
         BilateralFilter = 1,
         Composite = 2,
+        OnlyAO = 3,
     }
 
     private void Awake()
@@ -78,15 +79,6 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         ssaoMaterial.SetFloat("_SampleKernelCount", sampleKernelList.Count);
         ssaoMaterial.SetFloat("_SampleKeneralRadius", SampleKernelRadius);
         ssaoMaterial.SetFloat("_DepthBias", DepthBias);
-        
-        // ssaoMaterial.SetMatrix("_Inverse", (currentCamera.projectionMatrix * currentCamera.worldToCameraMatrix).inverse);
-
-        if (OnlyShowAO && !UseBlur)
-        {
-            Graphics.Blit(source, destination, ssaoMaterial, (int)SSAOPassName.GenerateAO);
-
-            return;
-        }
 
         var aoRT = RenderTexture.GetTemporary(source.width >> DownSample, source.height >> DownSample, 0);
         Graphics.Blit(source, aoRT, ssaoMaterial, (int)SSAOPassName.GenerateAO);
@@ -100,15 +92,8 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
             Graphics.Blit(aoRT, blurRT, ssaoMaterial, (int)SSAOPassName.BilateralFilter);
 
             ssaoMaterial.SetVector("_BlurRadius", new Vector4(0, BlurRadius, 0, 0));
-            if (OnlyShowAO)
-            {
-                Graphics.Blit(blurRT, destination, ssaoMaterial, (int)SSAOPassName.BilateralFilter);
-            }
-            else
-            {
-                Graphics.Blit(blurRT, aoRT, ssaoMaterial, (int)SSAOPassName.BilateralFilter);
-            }
-            
+            Graphics.Blit(blurRT, aoRT, ssaoMaterial, (int)SSAOPassName.BilateralFilter);
+
             RenderTexture.ReleaseTemporary(blurRT);
         }
 
@@ -116,6 +101,11 @@ public class ScreenSpaceAmbientOcclusion : MonoBehaviour
         {
             ssaoMaterial.SetTexture("_AOTex", aoRT);
             Graphics.Blit(source, destination, ssaoMaterial, (int)SSAOPassName.Composite);
+        }
+        else
+        {
+            ssaoMaterial.SetTexture("_AOTex", aoRT);
+            Graphics.Blit(source, destination, ssaoMaterial, (int)SSAOPassName.OnlyAO);
         }
 
         RenderTexture.ReleaseTemporary(aoRT);

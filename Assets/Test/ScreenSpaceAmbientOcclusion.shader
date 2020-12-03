@@ -222,8 +222,7 @@
         }
         oc = oc / sampleCount;
 
-        col.rgb = oc;
-        return col;
+        return fixed4(viewNormal * 0.5 + 0.5, oc);
     }
 
     v2f vert(appdata v)
@@ -257,25 +256,33 @@
         fixed4 col2b = tex2D(_MainTex, uv2b);
 
         #ifndef BILATERAL_FILTER
-        half4 result;
-        result = col;
-        result += col0a;
-        result += col0b;
-        result += col1a;
-        result += col1b;
-        result += col2a;
-        result += col2b;
+        half result;
+        result = col.a;
+        result += col0a.a;
+        result += col0b.a;
+        result += col1a.a;
+        result += col1b.a;
+        result += col2a.a;
+        result += col2b.a;
 
-        return result / 7;
+        return fixed4(col.rgb, result / 7);
         #else
 
-        float3 normal = GetNormal(uv, i.worldRay);
-        float3 normal0a = GetNormal(uv0a, i.worldRay);
-        float3 normal0b = GetNormal(uv0b, i.worldRay);
-        float3 normal1a = GetNormal(uv1a, i.worldRay);
-        float3 normal1b = GetNormal(uv1b, i.worldRay);
-        float3 normal2a = GetNormal(uv2a, i.worldRay);
-        float3 normal2b = GetNormal(uv2b, i.worldRay);
+        // float3 normal = GetNormal(uv, i.worldRay);
+        // float3 normal0a = GetNormal(uv0a, i.worldRay);
+        // float3 normal0b = GetNormal(uv0b, i.worldRay);
+        // float3 normal1a = GetNormal(uv1a, i.worldRay);
+        // float3 normal1b = GetNormal(uv1b, i.worldRay);
+        // float3 normal2a = GetNormal(uv2a, i.worldRay);
+        // float3 normal2b = GetNormal(uv2b, i.worldRay);
+
+        float3 normal = col.rgb * 2 - 1;
+        float3 normal0a = col0a.rgb * 2 - 1;
+        float3 normal0b = col0b.rgb * 2 - 1;
+        float3 normal1a = col1a.rgb * 2 - 1;
+        float3 normal1b = col1b.rgb * 2 - 1;
+        float3 normal2a = col2a.rgb * 2 - 1;
+        float3 normal2b = col2b.rgb * 2 - 1;
 
         half w = 0.37004405286;
         half w0a = CompareNormal(normal, normal0a) * 0.31718061674;
@@ -285,17 +292,18 @@
         half w2a = CompareNormal(normal, normal2a) * 0.11453744493;
         half w2b = CompareNormal(normal, normal2b) * 0.11453744493;
 
-        half3 result;
-        result = w * col.rgb;
-        result += w0a * col0a.rgb;
-        result += w0b * col0b.rgb;
-        result += w1a * col1a.rgb;
-        result += w1b * col1b.rgb;
-        result += w2a * col2a.rgb;
-        result += w2b * col2b.rgb;
+        half result;
+        result = w * col.a;
+        result += w0a * col0a.a;
+        result += w0b * col0b.a;
+        result += w1a * col1a.a;
+        result += w1b * col1b.a;
+        result += w2a * col2a.a;
+        result += w2b * col2b.a;
 
         result /= w + w0a + w0b + w1a + w1b + w2a + w2b;
-        return fixed4(result, 1.0);
+        
+        return fixed4(col.rgb, result);
         #endif
     }
 
@@ -304,8 +312,15 @@
     {
         fixed4 ori = tex2D(_MainTex, i.uv);
         fixed4 ao = tex2D(_AOTex, i.uv);
-        ori.rgb *= ao.r;
+        ori.rgb *= ao.a;
         return ori;
+    }
+
+    fixed4 frag_only_ao(v2f i) : SV_Target
+    {
+        fixed4 ao = tex2D(_AOTex, i.uv);
+        
+        return ao.a;
     }
     ENDCG
 
@@ -340,6 +355,14 @@
             #pragma fragment frag_composite
             ENDCG
         }
-
+        
+        //Pass 3 : Only AO
+        Pass
+        {
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag_only_ao
+            ENDCG
+        }
     }
 }
